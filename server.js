@@ -2,8 +2,8 @@
 
 const express = require('express');
 const cors = require('cors');
-const puppeteer = require('puppeteer-core');
-const chromium = require('chrome-aws-lambda');
+const puppeteer = require('puppeteer-core'); // Still puppeteer-core
+const chromium = require('@sparticuz/chromium'); // <<-- MODIFIED: Use @sparticuz/chromium
 const rateLimit = require('express-rate-limit');
 
 const app = express();
@@ -46,9 +46,11 @@ async function scrapeCode360Puppeteer(username) {
     let browser;
     try {
       browser = await puppeteer.launch({
+        // These arguments are crucial for serverless environments
         args: chromium.args,
-        executablePath: await chromium.executablePath,
-        headless: chromium.headless,
+        executablePath: await chromium.executablePath(), // <<-- MODIFIED: Call executablePath as a function
+        headless: chromium.headless, // Use headless setting from @sparticuz/chromium
+        ignoreHTTPSErrors: true, // Often useful in serverless environments
       });
 
       const page = await browser.newPage();
