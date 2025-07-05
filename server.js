@@ -1,19 +1,19 @@
 // server.js
 
-const express = require('express');
-const cors = require('cors');
-const puppeteer = require('puppeteer-core'); // Still puppeteer-core
-const chromium = require('@sparticuz/chromium'); // <<-- MODIFIED: Use @sparticuz/chromium
-const rateLimit = require('express-rate-limit');
+import express from 'express'; // Changed
+import cors from 'cors';       // Changed
+import puppeteer from 'puppeteer-core'; // Changed
+import chromium from '@sparticuz/chromium'; // Changed
+import rateLimit from 'express-rate-limit'; // Changed
 
 const app = express();
-// const PORT = process.env.PORT || 3000; // REMOVED: No longer needed for Vercel deployment
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // Rate limiting
+// (Rest of your rateLimit definition is fine)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 50, // Reduced limit for Code360
@@ -46,11 +46,10 @@ async function scrapeCode360Puppeteer(username) {
     let browser;
     try {
       browser = await puppeteer.launch({
-        // These arguments are crucial for serverless environments
         args: chromium.args,
-        executablePath: await chromium.executablePath(), // <<-- MODIFIED: Call executablePath as a function
-        headless: chromium.headless, // Use headless setting from @sparticuz/chromium
-        ignoreHTTPSErrors: true, // Often useful in serverless environments
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+        ignoreHTTPSErrors: true,
       });
 
       const page = await browser.newPage();
@@ -90,12 +89,8 @@ async function scrapeCode360Puppeteer(username) {
       // Wait for XP points (based on provided snippet)
       await page.waitForSelector('.xp-points', { timeout: 5000 }).catch(() => console.warn('XP points selector timed out.'));
 
-      // For badges, if they are in a distinct container, wait for that.
-      // Example: await page.waitForSelector('.badges-section', { timeout: 5000 }).catch(() => console.warn('Badges section timed out.'));
-
     } catch (e) {
       console.warn('Timeout waiting for core containers. Profile data might not be fully loaded or profile not found.');
-      // If a critical selector times out, it's often better to throw
       if (e.message.includes('timeout')) throw new Error(`Page element not found or timed out: ${e.message}`);
     }
 
@@ -168,7 +163,6 @@ async function scrapeCode360Puppeteer(username) {
           console.warn('DEBUG (page.evaluate): Difficulty-wise problems elements not found.');
       }
 
-
       // --- Extract Current Streak, Longest Streak, and Streak Freeze Left ---
       const streakContainer = document.querySelector('.current-and-longest-text-container');
       if (streakContainer) {
@@ -202,11 +196,9 @@ async function scrapeCode360Puppeteer(username) {
       // --- END STREAK LOGIC ---
 
       // --- Extract Joined Date (CRITICAL: NEEDS YOUR HTML SELECTOR) ---
-      // This is a common guess. You MUST verify this selector on the live page.
-      // E.g., use browser DevTools, right-click "Joined on: date", "Inspect" and copy Outer HTML or selector.
-      const joinedDateElement = document.querySelector('.profile-header-meta .member-since-text') || // Common pattern
-                                 document.querySelector('.some-class-for-joined-date-text') || // Placeholder 1
-                                 document.querySelector('.profile-details-section p.join-date'); // Placeholder 2
+      const joinedDateElement = document.querySelector('.profile-header-meta .member-since-text') ||
+                                 document.querySelector('.some-class-for-joined-date-text') ||
+                                 document.querySelector('.profile-details-section p.join-date');
 
       if (joinedDateElement) {
           const rawJoinedDateText = joinedDateElement.textContent.trim();
@@ -228,14 +220,9 @@ async function scrapeCode360Puppeteer(username) {
       // --- END EXP POINTS LOGIC ---
 
       // --- Extract Badge (CRITICAL: NEEDS YOUR HTML SELECTOR) ---
-      // This is a heuristic based on your provided snippet "1 Achiever".
-      // It tries to find a div whose text starts with a number and includes a word like "Achiever".
-      // This is prone to false positives if the page has other generic divs with similar text.
-      // Please provide a more specific selector if possible (e.g., a parent container or a specific class).
       const badgeElements = Array.from(document.querySelectorAll('div'));
       const foundBadgeElement = badgeElements.find(div => {
           const text = div.textContent.trim();
-          // Matches "1 Achiever", "5 Specialist", etc. and ensures it contains "Achiever" or "badge" (case-insensitive)
           return text.match(/^\d+\s+\w+/) && (text.toLowerCase().includes('achiever') || text.toLowerCase().includes('badge') || text.toLowerCase().includes('rank'));
       });
 
@@ -281,13 +268,11 @@ async function scrapeCode360(username) {
   try {
     const stats = await scrapeCode360Puppeteer(username);
 
-    // Validate that we got meaningful data.
     if (stats.totalSolved === 0 && stats.easySolved === 0 && stats.moderateSolved === 0 &&
         stats.hardSolved === 0 && stats.ninjaSolved === 0 && stats.currentStreak === 0 &&
         stats.longestStreak === 0 && stats.streakFreezeLeft === 0 && !stats.joinedDate &&
         stats.expcount === 0 && !stats.badge) {
       console.warn(`No statistics found for Code360 user '${username}'. Profile might be private or selectors need further updating. Check 'debug' field for partial page content.`);
-      // No need to log stats.debug here, as it's already logged in Puppeteer function on error.
     }
 
     return stats;
@@ -303,7 +288,7 @@ function formatCode360Data(stats) {
   return {
     totalSolved: stats.totalSolved || 0,
     easySolved: stats.easySolved || 0,
-    mediumSolved: stats.moderateSolved || 0, // Map 'moderate' to 'medium'
+    mediumSolved: stats.moderateSolved || 0,
     hardSolved: stats.hardSolved || 0,
     ninjaSolved: stats.ninjaSolved || 0,
     currentStreak: stats.currentStreak || 0,
@@ -315,24 +300,18 @@ function formatCode360Data(stats) {
   };
 }
 
-
-// --- API Routes (MODIFIED for desired JSON output, including expcount and badge) ---
-
-// Health check
+// --- API Routes ---
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', platform: 'Code360', timestamp: new Date().toISOString() });
 });
 
-// Scrape Code360 profile endpoint
 app.get('/api/code360/:username', async (req, res) => {
   try {
     const { username } = req.params;
-
     if (!username) {
       return res.status(400).json({ error: 'Username is required' });
     }
 
-    // Check cache first
     const cacheKey = `code360_${username}`;
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -351,19 +330,19 @@ app.get('/api/code360/:username', async (req, res) => {
       username: username,
       joinedDate: formattedCoreStats.joinedDate,
       totalSolved: formattedCoreStats.totalSolved,
-      totalQuestions: 0, // <--- Placeholder, requires scraping
+      totalQuestions: 0,
       easySolved: formattedCoreStats.easySolved,
-      totalEasy: 0, // <--- Placeholder, requires scraping
+      totalEasy: 0,
       mediumSolved: formattedCoreStats.mediumSolved,
-      totalMedium: 0, // <--- Placeholder, requires scraping
+      totalMedium: 0,
       hardSolved: formattedCoreStats.hardSolved,
-      totalHard: 0, // <--- Placeholder, requires scraping
+      totalHard: 0,
       ninjaSolved: formattedCoreStats.ninjaSolved,
-      acceptanceRate: 0.0, // <--- Placeholder, requires scraping
-      ranking: 0,           // <--- Placeholder, requires scraping
-      contributionPoints: 0, // <--- Placeholder, requires scraping
-      reputation: 0,         // <--- Placeholder, requires scraping
-      submissionCalendar: {}, // <--- Placeholder, requires complex scraping
+      acceptanceRate: 0.0,
+      ranking: 0,
+      contributionPoints: 0,
+      reputation: 0,
+      submissionCalendar: {},
       currentStreak: formattedCoreStats.currentStreak,
       longestStreak: formattedCoreStats.longestStreak,
       streakFreezeLeft: formattedCoreStats.streakFreezeLeft,
@@ -371,7 +350,6 @@ app.get('/api/code360/:username', async (req, res) => {
       badge: formattedCoreStats.badge,
     };
 
-    // Cache the result
     cache.set(cacheKey, {
       data: finalResponse,
       timestamp: Date.now()
@@ -420,7 +398,7 @@ app.get('/api/test/codushan', async (req, res) => {
       totalHard: 0,
       ninjaSolved: formattedCoreStats.ninjaSolved,
       acceptanceRate: 0.0,
-      stabilityScore: 0, // Placeholder
+      stabilityScore: 0,
       ranking: 0,
       contributionPoints: 0,
       reputation: 0,
@@ -441,7 +419,6 @@ app.get('/api/test/codushan', async (req, res) => {
     });
   }
 });
-
 
 // Clear cache endpoint
 app.post('/api/cache/clear', (req, res) => {
@@ -464,7 +441,5 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// REMOVED: Start server (app.listen) and Graceful shutdown (process.on) for Vercel deployment.
-// Vercel handles the server lifecycle for serverless functions.
-
-module.exports = app;
+// Export the Express app for Vercel (ESM syntax)
+export default app; // Changed

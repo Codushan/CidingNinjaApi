@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Web scraper for Coding Ninjas profile statistics",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
