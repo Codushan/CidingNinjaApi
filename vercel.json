@@ -1,0 +1,16 @@
+// vercel.json
+{
+    "version": 2,
+    "builds": [
+      {
+        "src": "server.js", // Path to your Express entry file
+        "use": "@vercel/node"
+      }
+    ],
+    "routes": [
+      {
+        "src": "/(.*)", // Route all /api requests to your Express app
+        "dest": "server.js"
+      }
+    ]
+  }
