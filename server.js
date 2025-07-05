@@ -1,10 +1,13 @@
+// server.js
+
 const express = require('express');
 const cors = require('cors');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('chrome-aws-lambda');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+// const PORT = process.env.PORT || 3000; // REMOVED: No longer needed for Vercel deployment
 
 // Middleware
 app.use(cors());
@@ -40,23 +43,15 @@ function parseDate(text) {
 
 // Function to scrape Code360 profile using Puppeteer
 async function scrapeCode360Puppeteer(username) {
-  let browser;
-  try {
-    browser = await puppeteer.launch({
-      headless: true, // Set to false temporarily for visual debugging if needed
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-extensions',
-      ],
-    });
+    let browser;
+    try {
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        executablePath: await chromium.executablePath,
+        headless: chromium.headless,
+      });
 
-    const page = await browser.newPage();
+      const page = await browser.newPage();
 
     // Set realistic user agent and viewport
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -208,8 +203,8 @@ async function scrapeCode360Puppeteer(username) {
       // This is a common guess. You MUST verify this selector on the live page.
       // E.g., use browser DevTools, right-click "Joined on: date", "Inspect" and copy Outer HTML or selector.
       const joinedDateElement = document.querySelector('.profile-header-meta .member-since-text') || // Common pattern
-                                document.querySelector('.some-class-for-joined-date-text') || // Placeholder 1
-                                document.querySelector('.profile-details-section p.join-date'); // Placeholder 2
+                                 document.querySelector('.some-class-for-joined-date-text') || // Placeholder 1
+                                 document.querySelector('.profile-details-section p.join-date'); // Placeholder 2
 
       if (joinedDateElement) {
           const rawJoinedDateText = joinedDateElement.textContent.trim();
@@ -363,9 +358,9 @@ app.get('/api/code360/:username', async (req, res) => {
       totalHard: 0, // <--- Placeholder, requires scraping
       ninjaSolved: formattedCoreStats.ninjaSolved,
       acceptanceRate: 0.0, // <--- Placeholder, requires scraping
-      ranking: 0,          // <--- Placeholder, requires scraping
+      ranking: 0,           // <--- Placeholder, requires scraping
       contributionPoints: 0, // <--- Placeholder, requires scraping
-      reputation: 0,       // <--- Placeholder, requires scraping
+      reputation: 0,         // <--- Placeholder, requires scraping
       submissionCalendar: {}, // <--- Placeholder, requires complex scraping
       currentStreak: formattedCoreStats.currentStreak,
       longestStreak: formattedCoreStats.longestStreak,
@@ -423,6 +418,7 @@ app.get('/api/test/codushan', async (req, res) => {
       totalHard: 0,
       ninjaSolved: formattedCoreStats.ninjaSolved,
       acceptanceRate: 0.0,
+      stabilityScore: 0, // Placeholder
       ranking: 0,
       contributionPoints: 0,
       reputation: 0,
@@ -466,26 +462,7 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Code360 scraper server running on port ${PORT}`);
-  console.log(`📊 API endpoints:`);
-  console.log(`   GET  /api/health - Health check`);
-  console.log(`   GET  /api/code360/:username - Scrape Code360 profile`);
-  console.log(`   GET  /api/test/codushan - Test specific user (e.g., Codushan)`);
-  console.log(`   POST /api/cache/clear - Clear cache`);
-  console.log(`   GET  /api/cache/stats - Cache statistics`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
+// REMOVED: Start server (app.listen) and Graceful shutdown (process.on) for Vercel deployment.
+// Vercel handles the server lifecycle for serverless functions.
 
 module.exports = app;
