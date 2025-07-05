@@ -1,15 +1,17 @@
-// vercel.json
 {
     "version": 2,
     "builds": [
       {
-        "src": "server.js", // Path to your Express entry file
-        "use": "@vercel/node"
+        "src": "server.js",
+        "use": "@vercel/node",
+        "config": {
+          "NODE_OPTIONS": "--openssl-legacy-provider"
+        }
       }
     ],
     "routes": [
       {
-        "src": "/(.*)", // Route all /api requests to your Express app
+        "src": "/(.*)",
         "dest": "server.js"
       }
     ]
